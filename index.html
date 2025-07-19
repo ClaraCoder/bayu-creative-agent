@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <title>Bayu Creative Agent</title>
+  <style>
+    /* Sesuaikan gaya widget */
+    #agentWidget { position: fixed; bottom: 20px; right: 20px; width: 320px; }
+    #chatLog { height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 8px; }
+    button { margin: 4px; }
+  </style>
+</head>
+<body>
+  <div id="agentWidget">
+    <div id="chatLog"></div>
+    <input id="txtInput" placeholder="Taip soalan…" style="width: 70%" />
+    <button id="btnSend">Hantar</button>
+    <button id="btnSpeak">🎤</button>
+  </div>
+
+  <script>
+    const API_URL = "https://hf.space/embed/USERNAME/REPO_NAME/api/predict";
+
+    // Web Speech API setup
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognizer = new SpeechRec();
+    recognizer.lang = "ms-MY";
+    recognizer.interimResults = false;
+
+    // Fungsi kirim teks/audio ke backend
+    async function queryAgent(text, audioBlob) {
+      const form = new FormData();
+      if (audioBlob) form.append("data", audioBlob, "voice.wav");
+      else form.append("data", text);
+      const res = await fetch(API_URL, { method: "POST", body: form });
+      const j = await res.json();
+      // j.data = [jawapan, url_wav]
+      return j.data;
+    }
+
+    // Render chat
+    function appendLog(who, msg) {
+      const log = document.getElementById("chatLog");
+      log.innerHTML += `<div><b>${who}:</b> ${msg}</div>`;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    document.getElementById("btnSend").onclick = async () => {
+      const txt = document.getElementById("txtInput").value;
+      if (!txt) return;
+      appendLog("Kamu", txt);
+      document.getElementById("txtInput").value = "";
+      const [reply, wav_url] = await queryAgent(txt, null);
+      appendLog("Agent", reply);
+      const audio = new Audio(wav_url);
+      audio.play();
+    };
+
+    document.getElementById("btnSpeak").onclick = () => {
+      recognizer.start();
+    };
+
+    recognizer.onresult = async (e) => {
+      const speech = e.results[0][0].transcript;
+      appendLog("Kamu (suara)", speech);
+      const [reply, wav_url] = await queryAgent(null, await fetch(e.results[0][0])); 
+      appendLog("Agent", reply);
+      new Audio(wav_url).play();
+    };
+  </script>
+</body>
+</html>
